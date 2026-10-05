@@ -760,8 +760,11 @@ struct MainView: View {
         VStack(alignment: .leading, spacing: 12) {
             ModePicker(mode: $mode)
             QueryField(model: model, mode: mode, focusOnAppear: true)
-            Toggle("Show as menu bar icon when minimized", isOn: $menuBarWhenMinimized)
-                .toggleStyle(.checkbox)
+            HStack(alignment: .top, spacing: 20) {
+                Toggle("Show as menu bar icon when minimized", isOn: $menuBarWhenMinimized)
+                    .toggleStyle(.checkbox)
+                LaunchAtLoginToggle()
+            }
             if mode == .subnet {
                 Divider()
                 SubnetCalculatorView(model: model, compact: false)
@@ -884,8 +887,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.animates = true
 
-        window.makeKeyAndOrderFront(nil)
-        activate()
+        // Started at login: go straight to the menu bar instead of opening a window, if that option is on.
+        if LaunchAtLogin.launchedAtLogin && Settings.menuBarWhenMinimized {
+            enterMenuBarMode()
+        } else {
+            window.makeKeyAndOrderFront(nil)
+            activate()
+        }
     }
 
     /// Closing the window quits, but hiding it to the menu bar must not: AppKit treats ordering out
@@ -936,11 +944,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         activate()
     }
 
+    @objc private func toggleOpenAtLogin() {
+        LaunchAtLogin.shared.setEnabled(!LaunchAtLogin.shared.isEnabled)
+        if let error = LaunchAtLogin.shared.errorMessage {
+            let alert = NSAlert()
+            alert.messageText = "Open at Login"
+            alert.informativeText = error
+            alert.runModal()
+        } else if LaunchAtLogin.shared.needsApproval {
+            LaunchAtLogin.shared.openLoginItemsSettings()
+        }
+    }
+
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
             let menu = NSMenu()
             menu.addItem(withTitle: "Open IP Toolkit", action: #selector(showMainWindow), keyEquivalent: "").target = self
+            let login = menu.addItem(withTitle: "Open at Login", action: #selector(toggleOpenAtLogin), keyEquivalent: "")
+            login.target = self
+            LaunchAtLogin.shared.refresh()
+            login.state = LaunchAtLogin.shared.isEnabled ? .on : .off
             menu.addItem(.separator())
             menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)

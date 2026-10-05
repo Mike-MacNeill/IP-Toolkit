@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
 APP="$ROOT/dist/IP Toolkit.app"
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
-SOURCES=("$ROOT/Sources/IPAddress.swift" "$ROOT/Sources/RDAP.swift" "$ROOT/Sources/Subnet.swift" "$ROOT/Sources/Geo.swift" "$ROOT/Sources/NetTools.swift" "$ROOT/Sources/MyIP.swift" "$ROOT/Sources/IconDrawing.swift"
+SOURCES=("$ROOT/Sources/IPAddress.swift" "$ROOT/Sources/RDAP.swift" "$ROOT/Sources/Subnet.swift" "$ROOT/Sources/Geo.swift" "$ROOT/Sources/NetTools.swift" "$ROOT/Sources/MyIP.swift" "$ROOT/Sources/LaunchAtLogin.swift" "$ROOT/Sources/IconDrawing.swift"
          "$ROOT/Sources/App.swift" "$ROOT/Sources/main.swift")
 
 rm -rf "$APP"

@@ -22,6 +22,18 @@ The window shows:
 - A table of every CIDR registered to that owner, with network names and handles.
   **Copy CIDRs** puts the list on the clipboard, one per line.
 
+### Open at login
+
+Check **Open at login** in the main window (or right-click the menu bar icon →
+**Open at Login**) to start IP Toolkit automatically when you log in. When started
+at login with **Show as menu bar icon when minimized** on, the app goes straight
+to the menu bar without opening a window.
+
+The setting uses macOS's login items (System Settings → General → Login Items),
+which also show and control it. macOS may ask you to allow the item there first.
+The login item points to the app's current location, so if you move the app
+(for example into Applications), turn the option off and on again.
+
 ### My IP
 
 The **My IP** button next to the input box (in every tool, including the menu bar
