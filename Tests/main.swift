@@ -205,13 +205,13 @@ for bad in ["", "-c 99 8.8.8.8", "-oops", "bad host", "a..b", "x;rm -rf", "999.1
 }
 do {
     let v4 = NetTarget(host: "8.8.8.8", isIPv6: false), v6 = NetTarget(host: "::1", isIPv6: true)
-    let (p1, a1) = NetCommand.build(.ping, v4, NetToolOptions())
+    let (p1, a1) = try! NetCommand.build(.ping, v4, NetToolOptions())
     check(p1.path == "/sbin/ping" && a1 == ["-c", "5", "-n", "8.8.8.8"], "Ping args \(a1)")
-    let (p2, a2) = NetCommand.build(.ping, v6, NetToolOptions(pingCount: 0, resolveNames: true))
+    let (p2, a2) = try! NetCommand.build(.ping, v6, NetToolOptions(pingCount: 0, resolveNames: true))
     check(p2.path == "/sbin/ping6" && a2 == ["::1"], "Continuous ping6 args \(a2)")
-    let (p3, a3) = NetCommand.build(.traceroute, v4, NetToolOptions(maxHops: 15))
+    let (p3, a3) = try! NetCommand.build(.traceroute, v4, NetToolOptions(maxHops: 15))
     check(p3.path == "/usr/sbin/traceroute" && a3 == ["-I", "-q", "1", "-w", "2", "-m", "15", "-n", "8.8.8.8"], "Trace args \(a3)")
-    check(NetCommand.build(.traceroute, v6, NetToolOptions()).0.path == "/usr/sbin/traceroute6", "traceroute6")
+    check(try! NetCommand.build(.traceroute, v6, NetToolOptions()).0.path == "/usr/sbin/traceroute6", "traceroute6")
 }
 let pingOut = """
 PING 8.8.8.8 (8.8.8.8): 56 data bytes
@@ -238,6 +238,60 @@ check(hops[0] == TraceHop(number: 1, address: "10.52.23.1", hostname: "router.lo
 check(hops[1].address == nil && hops[1].times.isEmpty, "Silent hop")
 check(hops[2].address == "74.125.233.144" && hops[2].hostname == nil && hops[2].times == [37.097], "Numeric hop")
 check(hops[3].address == "2001:db8::1", "IPv6 hop")
+
+// MARK: nmap port scan
+check(try! NetTarget.parseScanTarget("10.0.0.0/24") == NetTarget(host: "10.0.0.0/24", isIPv6: false, prefixLength: 24), "Scan CIDR kept")
+check(try! NetTarget.parseScanTarget("10.0.0.7/24").host == "10.0.0.0/24", "Scan CIDR normalized")
+check(try! NetTarget.parseScanTarget("10.0.0.7/32") == NetTarget(host: "10.0.0.7", isIPv6: false), "Scan /32 is a host")
+check(try! NetTarget.parseScanTarget("2001:db8::/120").prefixLength == 120, "Scan v6 /120")
+check(try! NetTarget.parseScanTarget("scanme.nmap.org").host == "scanme.nmap.org", "Scan hostname")
+for bad in ["10.0.0.0/19", "10.0.0.0/8", "2001:db8::/64", "10.0.0.0/33", "-sS 1.2.3.4", "x/24"] {
+    check((try? NetTarget.parseScanTarget(bad)) == nil, "Rejects scan target \(bad)")
+}
+check(try! NetCommand.normalizedPorts("22, 80,443,8000-8100") == "22,80,443,8000-8100", "Ports normalized")
+for bad in ["", "0", "65536", "80-22", "22,,80", "-p 80", "80;ls", "+80", "1-2-3", "abc"] {
+    check((try? NetCommand.normalizedPorts(bad)) == nil, "Rejects ports \(bad)")
+}
+do {
+    let nmap = URL(fileURLWithPath: "/opt/homebrew/bin/nmap")
+    let host = NetTarget(host: "192.0.2.5", isIPv6: false)
+    let (exe, a1) = try! NetCommand.build(.portScan, host, NetToolOptions(), nmap: nmap)
+    check(exe == nmap && a1 == ["-sT", "-T4", "--stats-every", "5s", "-F", "-sV", "--version-light", "--open", "-Pn", "-n", "192.0.2.5"], "nmap default args \(a1)")
+    var o = NetToolOptions(resolveNames: true)
+    o.scanPorts = .custom; o.customPorts = "22,443"; o.serviceVersions = false; o.openOnly = false
+    let a2 = try! NetCommand.nmapArguments(NetTarget(host: "2001:db8::/120", isIPv6: true, prefixLength: 120), o)
+    check(a2 == ["-sT", "-T4", "--stats-every", "5s", "-6", "-p", "22,443", "2001:db8::/120"], "nmap custom v6 range args \(a2)")
+    o.scanPorts = .all
+    check(try! NetCommand.nmapArguments(host, o).contains("-p-"), "nmap all ports")
+    do { _ = try NetCommand.build(.portScan, host, NetToolOptions(), nmap: nil); check(false, "nmap missing should throw") }
+    catch { check((error as? NetToolError) == .nmapNotFound, "nmap missing error") }
+}
+let scan = NmapOutputParser.parse("""
+Starting Nmap 7.98 ( https://nmap.org ) at 2025-01-01 10:00 EST
+Stats: 0:00:03 elapsed; 0 hosts completed (1 up), 1 undergoing Connect Scan
+Connect Scan Timing: About 42.50% done; ETC: 10:00 (0:00:04 remaining)
+Nmap scan report for router.local (192.168.1.1)
+Host is up (0.0040s latency).
+Not shown: 97 closed tcp ports (conn-refused)
+PORT    STATE SERVICE VERSION
+22/tcp  open  ssh     OpenSSH 9.6 (protocol 2.0)
+80/tcp  open  http    nginx
+443/tcp filtered https
+
+Nmap scan report for 192.168.1.20
+Host is up (0.010s latency).
+PORT     STATE SERVICE
+8080/tcp open  http-proxy
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 256 IP addresses (2 hosts up) scanned in 12.34 seconds
+""".components(separatedBy: "\n"))
+check(scan.hostsUp == ["router.local (192.168.1.1)", "192.168.1.20"], "Scan hosts \(scan.hostsUp)")
+check(scan.ports.count == 4 && scan.openCount == 3, "Scan port counts")
+check(scan.ports[0] == ScanPort(host: "router.local (192.168.1.1)", port: 22, proto: "tcp", state: "open", service: "ssh", version: "OpenSSH 9.6 (protocol 2.0)"), "Scan port with version")
+check(scan.ports[2].state == "filtered" && scan.ports[2].version == "", "Filtered port")
+check(scan.progress == nil && scan.doneLine?.hasPrefix("Nmap done: 256") == true, "Scan done line")
+check(NmapOutputParser.parse(["Connect Scan Timing: About 42.50% done; ETC: 10:00"]).progress == 42.5, "Scan progress")
 
 // MARK: My IP
 check(MyIPParser.address(from: "144.125.244.139\n", family: .v4) == "144.125.244.139", "My IP v4 parse")
@@ -303,7 +357,8 @@ if CommandLine.arguments.contains("--live") {
 
     // Real ping/traceroute through the same runner the app uses.
     func runTool(_ tool: NetTool, _ host: String, _ opts: NetToolOptions, stopAfter: Double? = nil) -> [String] {
-        let (exe, args) = NetCommand.build(tool, try! NetTarget.parse(host), opts)
+        let target = tool == .portScan ? try! NetTarget.parseScanTarget(host) : try! NetTarget.parse(host)
+        let (exe, args) = try! NetCommand.build(tool, target, opts)
         let runner = NetCommandRunner(executable: exe, arguments: args)
         final class Lines: @unchecked Sendable { let lock = NSLock(); var all: [String] = [] }
         let box = Lines()
@@ -341,6 +396,17 @@ if CommandLine.arguments.contains("--live") {
     let th = NetOutputParser.traceroute(traceLines)
     print("LIVE traceroute: \(th.count) hops, last \(th.last?.address ?? "*")")
     check(th.last?.address == "8.8.8.8", "Traceroute reaches 8.8.8.8")
+
+    if NmapLocator.find() != nil {
+        var o = NetToolOptions()
+        o.scanPorts = .custom; o.customPorts = "22,80,443"; o.openOnly = false; o.serviceVersions = false
+        let scanLines = runTool(.portScan, "127.0.0.1", o)
+        let s = NmapOutputParser.parse(scanLines)
+        print("LIVE nmap: \(s.hostsUp) \(s.ports.map { "\($0.port)/\($0.state)" }) \(s.doneLine ?? "-")")
+        check(s.hostsUp.count == 1 && s.ports.count == 3 && s.doneLine != nil, "nmap scans localhost")
+    } else {
+        print("LIVE nmap: skipped (nmap not installed)")
+    }
 }
 
 if failures > 0 {

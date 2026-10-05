@@ -7,7 +7,8 @@ address or CIDR:
   registered to that same owner.
 - **Subnet Calculator:** offline subnet math and splitting.
 - **Geolocate:** estimates the address's physical location and shows it on a map.
-- **Ping / Trace:** runs ping or traceroute against an address or hostname with live output.
+- **Network:** runs ping, traceroute, or an nmap port scan against an address,
+  hostname, or (for port scans) a small CIDR range, with live output.
 
 ## Use
 
@@ -39,7 +40,7 @@ The login item points to the app's current location, so if you move the app
 The **My IP** button next to the input box (in every tool, including the menu bar
 box) finds this Mac's public internet address. It fills it in and runs the
 current tool, so you can see your own owner, subnet, or location in one click.
-Ping / Trace is only filled in, not started. Your public IPv4 and IPv6
+In **Network** the address is only filled in, not started. Your public IPv4 and IPv6
 addresses are shown under the input with copy buttons. "no IPv6" means your
 network doesn't have IPv6 internet access.
 
@@ -108,9 +109,9 @@ and hostname, plus a map pin. **Open in Maps** opens the location in Apple Maps;
 - Private, loopback, link-local, documentation, and other non-public addresses
   are rejected locally without contacting any service.
 
-### Ping / Trace
+### Network: Ping, Traceroute and Port Scan
 
-Switch to **Ping / Trace**, enter an IP address or hostname (for a CIDR, the
+Switch to **Network**, enter an IP address or hostname (for a CIDR, the
 address before the slash is used), pick **Ping** or **Traceroute**, and press
 Return or click **Start**. The button becomes **Stop** while it runs.
 
@@ -127,6 +128,28 @@ These run the system tools `/sbin/ping`, `/sbin/ping6`, `/usr/sbin/traceroute`,
 and `/usr/sbin/traceroute6`, so no extra privileges are needed. IPv6 literals use
 the IPv6 tools; hostnames are resolved over IPv4. Many networks drop ICMP, so
 `*`/timeout hops and unanswered pings don't necessarily mean a host is down.
+
+#### Port Scan (nmap)
+
+> Only scan hosts and networks you own or have permission to scan.
+
+**Port Scan** runs [nmap](https://nmap.org), which must be installed separately
+(`brew install nmap` or the installer from nmap.org). The app looks for it in
+`/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin` and `/usr/bin`.
+
+- **Target:** an IP address, hostname, or CIDR range up to `/20` for IPv4 (4,096
+  addresses) or `/120` for IPv6.
+- **Ports:** Top 100 (default), Top 1,000, All 65,535, or **Custom** (for example
+  `22,80,443,8000-8100`).
+- **Service versions** (`-sV --version-light`) identifies the software on open ports.
+- **Open only** (`--open`) hides closed and filtered ports.
+- **Assume up** (`-Pn`) scans a single host even if it doesn't answer discovery
+  probes. Ranges always use host discovery so empty addresses are skipped.
+
+The main window shows a Host / Port / State / Service / Version table and the
+scan's progress; the menu bar box shows nmap's raw output. Scans run without
+root, so nmap uses TCP connect scans (`-sT`). SYN, UDP and OS detection scans
+need root and aren't offered.
 
 ## Data sources
 
@@ -156,7 +179,7 @@ Requires Xcode or the Xcode Command Line Tools.
 ```sh
 bash build.sh        # builds dist/IP Toolkit.app and a ZIP
 bash test.sh         # offline unit tests + bundle checks
-bash test.sh --live  # also queries live registries, geolocation, ping and traceroute
+bash test.sh --live  # also queries live registries, geolocation, ping, traceroute and nmap (localhost)
 ```
 
 The app is ad-hoc signed, which is suitable for local use. On another Mac,

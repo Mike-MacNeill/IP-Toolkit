@@ -1,19 +1,34 @@
 import Foundation
 
 enum NetTool: String, CaseIterable, Identifiable {
-    case ping, traceroute
+    case ping, traceroute, portScan
     var id: Self { self }
-    var title: String { self == .ping ? "Ping" : "Traceroute" }
+    var title: String {
+        switch self {
+        case .ping: return "Ping"
+        case .traceroute: return "Traceroute"
+        case .portScan: return "Port Scan"
+        }
+    }
 }
 
 enum NetToolError: Error, LocalizedError, Equatable {
     case invalidTarget(String)
     case launchFailed(String)
+    case nmapNotFound
+    case rangeTooLarge(String, Int)
+    case invalidPorts(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidTarget(let s): return "“\(s)” is not a valid IP address or hostname."
         case .launchFailed(let s): return "Could not start the command: \(s)"
+        case .nmapNotFound:
+            return "nmap is not installed. Install it with Homebrew (brew install nmap) or from nmap.org, then try again."
+        case .rangeTooLarge(let s, let min):
+            return "\(s) is too large to scan. Use a /\(min) or smaller range."
+        case .invalidPorts(let s):
+            return "“\(s)” is not a valid port list. Use ports and ranges such as 22,80,443 or 8000-8100."
         }
     }
 }
@@ -22,6 +37,24 @@ enum NetToolError: Error, LocalizedError, Equatable {
 struct NetTarget: Equatable {
     let host: String
     let isIPv6: Bool
+    /// Set only for port-scan targets given as a CIDR range.
+    var prefixLength: Int? = nil
+
+    /// Smallest prefix (largest range) a port scan accepts: 4,096 IPv4 or 256 IPv6 addresses.
+    static let minScanPrefixV4 = 20
+    static let minScanPrefixV6 = 120
+
+    /// Like `parse`, but keeps a CIDR range so nmap can scan every address in it.
+    static func parseScanTarget(_ raw: String) throws -> NetTarget {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.contains("/") else { return try parse(raw) }
+        guard let cidr = CIDR(text) else { throw NetToolError.invalidTarget(raw) }
+        let isV6 = cidr.family == .v6
+        let minPrefix = isV6 ? minScanPrefixV6 : minScanPrefixV4
+        guard cidr.prefixLength >= minPrefix else { throw NetToolError.rangeTooLarge(cidr.description, minPrefix) }
+        if cidr.prefixLength == cidr.address.bitWidth { return NetTarget(host: cidr.address.description, isIPv6: isV6) }
+        return NetTarget(host: cidr.description, isIPv6: isV6, prefixLength: cidr.prefixLength)
+    }
 
     static func parse(_ raw: String) throws -> NetTarget {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -47,16 +80,50 @@ struct NetTarget: Equatable {
     }
 }
 
+enum ScanPorts: String, CaseIterable, Identifiable {
+    case quick, top1000, all, custom
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .quick: return "Top 100"
+        case .top1000: return "Top 1,000"
+        case .all: return "All 65,535"
+        case .custom: return "Custom"
+        }
+    }
+}
+
 struct NetToolOptions: Equatable {
     /// 0 means continuous until stopped.
     var pingCount = 5
     var maxHops = 30
     var resolveNames = false
+
+    var scanPorts: ScanPorts = .quick
+    var customPorts = "22,80,443"
+    var serviceVersions = true
+    var openOnly = true
+    /// Treat hosts as up (-Pn). Unprivileged host discovery only probes ports 80/443, so it often
+    /// wrongly reports firewalled hosts as down; ranges default to discovery so empty addresses are skipped.
+    var skipHostDiscovery = true
+}
+
+enum NmapLocator {
+    /// GUI apps don't inherit the shell PATH, so check the usual install locations directly.
+    static let candidates = ["/opt/homebrew/bin/nmap", "/usr/local/bin/nmap", "/opt/local/bin/nmap", "/usr/bin/nmap"]
+
+    static func find(fileManager: FileManager = .default) -> URL? {
+        candidates.first { fileManager.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
+    }
 }
 
 enum NetCommand {
-    static func build(_ tool: NetTool, _ target: NetTarget, _ options: NetToolOptions) -> (URL, [String]) {
+    static func build(_ tool: NetTool, _ target: NetTarget, _ options: NetToolOptions,
+                      nmap: URL? = NmapLocator.find()) throws -> (URL, [String]) {
         switch tool {
+        case .portScan:
+            guard let nmap else { throw NetToolError.nmapNotFound }
+            return (nmap, try nmapArguments(target, options))
         case .ping:
             var args: [String] = []
             if options.pingCount > 0 { args += ["-c", String(options.pingCount)] }
@@ -69,6 +136,40 @@ enum NetCommand {
             return (URL(fileURLWithPath: target.isIPv6 ? "/usr/sbin/traceroute6" : "/usr/sbin/traceroute"),
                     args + [target.host])
         }
+    }
+}
+
+extension NetCommand {
+    /// Validates "22,80,443" / "1-1024,8080" style lists so nothing else reaches nmap's -p.
+    static func normalizedPorts(_ text: String) throws -> String {
+        let cleaned = text.replacingOccurrences(of: " ", with: "")
+        let items = cleaned.split(separator: ",", omittingEmptySubsequences: false)
+        guard !cleaned.isEmpty, items.count <= 100 else { throw NetToolError.invalidPorts(text) }
+        for item in items {
+            let bounds = item.split(separator: "-", omittingEmptySubsequences: false)
+            let values = bounds.compactMap { $0.count <= 5 && $0.allSatisfy { ("0"..."9").contains($0) } ? Int($0) : nil }
+            guard (1...2).contains(bounds.count), values.count == bounds.count,
+                  values.allSatisfy({ (1...65535).contains($0) }), values[0] <= values[values.count - 1]
+            else { throw NetToolError.invalidPorts(text) }
+        }
+        return cleaned
+    }
+
+    static func nmapArguments(_ target: NetTarget, _ options: NetToolOptions) throws -> [String] {
+        // TCP connect scan works without root; -T4 is nmap's recommended "aggressive" timing for decent links.
+        var args = ["-sT", "-T4", "--stats-every", "5s"]
+        if target.isIPv6 { args.append("-6") }
+        switch options.scanPorts {
+        case .quick: args.append("-F")
+        case .top1000: break
+        case .all: args.append("-p-")
+        case .custom: args += ["-p", try normalizedPorts(options.customPorts)]
+        }
+        if options.serviceVersions { args += ["-sV", "--version-light"] }
+        if options.openOnly { args.append("--open") }
+        if options.skipHostDiscovery && target.prefixLength == nil { args.append("-Pn") }
+        if !options.resolveNames { args.append("-n") }
+        return args + [target.host]
     }
 }
 
@@ -96,6 +197,64 @@ struct TraceHop: Equatable, Identifiable {
     var hostname: String?
     var times: [Double]
     var id: Int { number }
+}
+
+struct ScanPort: Equatable, Identifiable {
+    let host: String
+    let port: Int
+    let proto: String
+    let state: String
+    let service: String
+    let version: String
+    var id: String { "\(host) \(port)/\(proto)" }
+}
+
+struct ScanSummary: Equatable {
+    var ports: [ScanPort] = []
+    var hostsUp: [String] = []
+    /// Latest "About N% done" from --stats-every.
+    var progress: Double?
+    var doneLine: String?
+    var openCount: Int { ports.filter { $0.state == "open" }.count }
+}
+
+enum NmapOutputParser {
+    static func parse(_ lines: [String]) -> ScanSummary {
+        var summary = ScanSummary()
+        var host: String?
+        var hostIsListed = false
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("Nmap scan report for ") {
+                host = String(line.dropFirst("Nmap scan report for ".count))
+                hostIsListed = false
+            } else if line.hasPrefix("Host is up"), let host, !hostIsListed {
+                summary.hostsUp.append(host)
+                hostIsListed = true
+            } else if line.hasPrefix("Nmap done:") {
+                summary.doneLine = line
+                summary.progress = nil
+            } else if let r = line.range(of: "About "), let pct = line[r.upperBound...].split(separator: "%").first,
+                      let value = Double(pct), line.contains("% done") {
+                summary.progress = value
+            } else if let host, let port = portLine(line, host: host) {
+                summary.ports.append(port)
+                if !hostIsListed { summary.hostsUp.append(host); hostIsListed = true }
+            }
+        }
+        return summary
+    }
+
+    /// "22/tcp   open  ssh     OpenSSH 9.6 (protocol 2.0)"
+    private static func portLine(_ line: String, host: String) -> ScanPort? {
+        let cols = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true).map(String.init)
+        guard cols.count >= 2 else { return nil }
+        let pp = cols[0].split(separator: "/")
+        guard pp.count == 2, let port = Int(pp[0]), ["tcp", "udp", "sctp"].contains(String(pp[1])) else { return nil }
+        let version = cols.count > 3 ? cols[3].trimmingCharacters(in: .whitespaces) : ""
+        return ScanPort(host: host, port: port, proto: String(pp[1]), state: cols[1],
+                        service: cols.count > 2 ? cols[2] : "", version: version)
+    }
 }
 
 /// Parses ping/ping6/traceroute output incrementally, so stats are live while the command runs.

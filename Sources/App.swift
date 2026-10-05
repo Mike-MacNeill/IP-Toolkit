@@ -17,7 +17,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .lookup: return "Owner Lookup"
         case .subnet: return "Subnet Calculator"
         case .geolocate: return "Geolocate"
-        case .network: return "Ping / Trace"
+        case .network: return "Network"
         }
     }
 }
@@ -108,6 +108,7 @@ final class LookupModel: ObservableObject {
 
     var pingStats: PingStats { NetOutputParser.ping(netLines) }
     var traceHops: [TraceHop] { NetOutputParser.traceroute(netLines) }
+    var scanSummary: ScanSummary { NmapOutputParser.parse(netLines) }
     var netOutputText: String { netLines.joined(separator: "\n") }
 
     func toggleNetTool() {
@@ -118,11 +119,14 @@ final class LookupModel: ObservableObject {
         stopNetTool()
         netError = nil
         let target: NetTarget
-        do { target = try NetTarget.parse(query) } catch {
+        let exe: URL, args: [String]
+        do {
+            target = netTool == .portScan ? try NetTarget.parseScanTarget(query) : try NetTarget.parse(query)
+            (exe, args) = try NetCommand.build(netTool, target, netOptions)
+        } catch {
             netError = error.localizedDescription
             return
         }
-        let (exe, args) = NetCommand.build(netTool, target, netOptions)
         netRunID += 1
         let id = netRunID
         let runner = NetCommandRunner(executable: exe, arguments: args)
@@ -634,7 +638,9 @@ struct NetToolView: View {
             results
         } else if !compact {
             Spacer()
-            Text("Enter an IP address or hostname, choose Ping or Traceroute, and press Start.")
+            Text(model.netTool == .portScan
+                 ? "Enter an IP address, hostname or CIDR range (up to /20) and press Start to scan with nmap."
+                 : "Enter an IP address or hostname, choose Ping or Traceroute, and press Start.")
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
@@ -643,6 +649,37 @@ struct NetToolView: View {
     }
 
     private var controls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            mainControls
+            if model.netTool == .portScan { scanControls }
+        }
+        .controlSize(compact ? .small : .regular)
+        .disabled(model.netRunning)
+    }
+
+    private var scanControls: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                if model.netOptions.scanPorts == .custom {
+                    TextField("Ports, e.g. 22,80,8000-8100", text: $model.netOptions.customPorts)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(maxWidth: compact ? 150 : 220)
+                }
+                Toggle(compact ? "Versions" : "Service versions", isOn: $model.netOptions.serviceVersions).fixedSize()
+                Toggle(compact ? "Open only" : "Open ports only", isOn: $model.netOptions.openOnly).fixedSize()
+                Toggle(compact ? "Assume up" : "Assume host is up", isOn: $model.netOptions.skipHostDiscovery).fixedSize()
+                    .help("Skip host discovery (-Pn) for single hosts. Ranges always use discovery so empty addresses are skipped.")
+                Spacer(minLength: 0)
+            }
+            .toggleStyle(.checkbox)
+            Text("Only scan hosts and networks you own or have permission to scan.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var mainControls: some View {
         HStack(spacing: 12) {
             Picker("Tool", selection: $model.netTool) {
                 ForEach(NetTool.allCases) { Text($0.title).tag($0) }
@@ -650,7 +687,14 @@ struct NetToolView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            if model.netTool == .ping {
+            if model.netTool == .portScan {
+                Picker("Ports", selection: $model.netOptions.scanPorts) {
+                    ForEach(ScanPorts.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .help("Ports to scan")
+            } else if model.netTool == .ping {
                 Picker("Count", selection: $model.netOptions.pingCount) {
                     ForEach(Self.pingCounts, id: \.self) { Text($0 == 0 ? "Continuous" : "\($0)").tag($0) }
                 }
@@ -661,12 +705,11 @@ struct NetToolView: View {
                 }
                 .fixedSize()
             }
-            Toggle("Resolve names", isOn: $model.netOptions.resolveNames)
+            Toggle(compact ? "Resolve" : "Resolve names", isOn: $model.netOptions.resolveNames)
                 .toggleStyle(.checkbox)
+                .fixedSize()
             Spacer(minLength: 0)
         }
-        .controlSize(compact ? .small : .regular)
-        .disabled(model.netRunning)
     }
 
     @ViewBuilder private var status: some View {
@@ -677,10 +720,19 @@ struct NetToolView: View {
         } else if model.netRunning {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text(model.netRanTool == .ping && model.netOptions.pingCount == 0
-                     ? "Pinging continuously; press Stop to finish…" : "Running \(model.netRanTool.title.lowercased())…")
+                Text(runningText)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var runningText: String {
+        switch model.netRanTool {
+        case .ping where model.netOptions.pingCount == 0: return "Pinging continuously; press Stop to finish…"
+        case .portScan:
+            if let pct = model.scanSummary.progress { return String(format: "Scanning… about %.0f%% done", pct) }
+            return "Scanning…"
+        default: return "Running \(model.netRanTool.title.lowercased())…"
         }
     }
 
@@ -692,7 +744,22 @@ struct NetToolView: View {
             Button("Clear") { model.clearNetOutput() }.disabled(model.netRunning)
         }
         .controlSize(compact ? .small : .regular)
-        if model.netRanTool == .traceroute && !compact {
+        if model.netRanTool == .portScan && !compact && !model.scanSummary.ports.isEmpty {
+            Table(model.scanSummary.ports) {
+                TableColumn("Host") { Text($0.host).textSelection(.enabled) }.width(min: 120, ideal: 180)
+                TableColumn("Port") { p in
+                    Text(verbatim: "\(p.port)/\(p.proto)").font(.system(.body, design: .monospaced))
+                }
+                .width(min: 70, ideal: 80)
+                TableColumn("State") { p in
+                    Text(p.state).foregroundStyle(p.state == "open" ? .green : .secondary)
+                }
+                .width(min: 60, ideal: 80)
+                TableColumn("Service") { Text($0.service) }.width(min: 60, ideal: 90)
+                TableColumn("Version") { Text($0.version).textSelection(.enabled) }
+            }
+            .frame(minHeight: 200)
+        } else if model.netRanTool == .traceroute && !compact {
             Table(model.traceHops) {
                 TableColumn("Hop") { Text("\($0.number)").monospacedDigit() }.width(40)
                 TableColumn("Address") { hop in
@@ -721,6 +788,12 @@ struct NetToolView: View {
             Text(verbatim: stats.summaryText)
                 .font(compact ? .callout.bold() : .headline)
                 .foregroundStyle(stats.transmitted > 0 && stats.received == 0 ? .red : .primary)
+        } else if model.netRanTool == .portScan {
+            let scan = model.scanSummary
+            let hosts = scan.hostsUp.count
+            Text(verbatim: "\(hosts) host\(hosts == 1 ? "" : "s") up · \(scan.openCount) open port\(scan.openCount == 1 ? "" : "s")")
+                .font(compact ? .callout.bold() : .headline)
+                .help(scan.doneLine ?? "")
         } else {
             let hops = model.traceHops
             let reached = model.netRunning ? "" : hops.last.map {
