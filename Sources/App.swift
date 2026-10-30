@@ -6,18 +6,25 @@ enum Settings {
     static let menuBarWhenMinimizedKey = "menuBarWhenMinimized"
     static let modeKey = "mode"
     static var menuBarWhenMinimized: Bool { UserDefaults.standard.bool(forKey: menuBarWhenMinimizedKey) }
+
+    static func migrateMode(defaults: UserDefaults = .standard) {
+        if defaults.string(forKey: modeKey) == "geolocate" {
+            defaults.set(AppMode.lookup.rawValue, forKey: modeKey)
+        }
+    }
 }
 
 enum AppMode: String, CaseIterable, Identifiable {
-    case lookup, subnet, geolocate, network
+    case lookup, subnet, reputation, network, speedtest
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .lookup: return "Owner Lookup"
+        case .lookup: return "IP Lookup"
         case .subnet: return "Subnet Calculator"
-        case .geolocate: return "Geolocate"
+        case .reputation: return "Reputation"
         case .network: return "Network"
+        case .speedtest: return "Speed Test"
         }
     }
 }
@@ -31,6 +38,8 @@ func copyToPasteboard(_ text: String) {
 final class LookupModel: ObservableObject {
     @Published var query = ""
     @Published var splitPrefix = 0
+    @Published var subnetMaskInput = ""
+    @Published private(set) var subnetMaskError: String?
     @Published private(set) var isLoading = false
     @Published private(set) var result: LookupResult?
     @Published private(set) var errorMessage: String?
@@ -38,6 +47,16 @@ final class LookupModel: ObservableObject {
     @Published private(set) var isLocating = false
     @Published private(set) var geoResult: GeoResult?
     @Published private(set) var geoError: String?
+
+    @Published var reputationKeyInput = ""
+    @Published private(set) var reputationKeyStatus: String?
+    @Published private(set) var reputationKeyError: String?
+    @Published private(set) var isCheckingReputation = false
+    @Published private(set) var reputationResult: ReputationResult?
+    @Published private(set) var reputationError: String?
+    private let reputationClient = ReputationClient()
+    private let reputationKeyStore = ReputationKeyStore()
+    private var reputationTask: Task<Void, Never>?
 
     @Published var netTool: NetTool = .ping
     @Published var netOptions = NetToolOptions()
@@ -50,8 +69,8 @@ final class LookupModel: ObservableObject {
     private var netRunID = 0
     private static let maxNetLines = 5000
 
-    private let client = RDAPClient()
-    private let geoClient = GeoClient()
+    private let client: RDAPClient
+    private let geoClient: GeoClient
 
     @Published private(set) var isFindingMyIP = false
     @Published private(set) var myIP: MyIPResult?
@@ -60,18 +79,145 @@ final class LookupModel: ObservableObject {
     private var myIPTask: Task<Void, Never>?
     private var task: Task<Void, Never>?
     private var geoTask: Task<Void, Never>?
+    @Published private(set) var speedRunning = false
+    @Published private(set) var speedProgress = SpeedTestProgress(completed: 0, total: 12, phase: "Ready")
+    @Published private(set) var speedResult: SpeedTestResult?
+    @Published private(set) var speedError: String?
+    private let speedClient: SpeedTestClient
+    private var speedTask: Task<Void, Never>?
+    private var speedRunID = 0
+
+    init(client: RDAPClient = RDAPClient(), geoClient: GeoClient = GeoClient(),
+         speedClient: SpeedTestClient = SpeedTestClient()) {
+        self.client = client
+        self.geoClient = geoClient
+        self.speedClient = speedClient
+    }
+
+    func startSpeedTest() {
+        guard !speedRunning else { return }
+        speedRunID += 1
+        let id = speedRunID
+        speedRunning = true
+        speedError = nil
+        speedResult = nil
+        speedProgress = SpeedTestProgress(completed: 0, total: 12, phase: "Starting")
+        speedTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await speedClient.run { [weak self] progress in
+                    Task { @MainActor in
+                        guard let self, self.speedRunID == id, self.speedRunning else { return }
+                        self.speedProgress = progress
+                    }
+                }
+                guard !Task.isCancelled, speedRunID == id else { return }
+                speedResult = result
+                speedProgress = SpeedTestProgress(completed: 12, total: 12, phase: "Complete")
+            } catch {
+                guard !Task.isCancelled, speedRunID == id else { return }
+                speedError = error.localizedDescription
+            }
+            speedRunning = false
+            speedTask = nil
+        }
+    }
+
+    func stopSpeedTest() {
+        guard speedRunning else { return }
+        speedRunID += 1
+        speedTask?.cancel()
+        speedTask = nil
+        speedRunning = false
+        speedProgress = SpeedTestProgress(completed: 0, total: 12, phase: "Stopped")
+    }
+
+    func applySubnetNotation(_ notation: String) {
+        guard let current = SubnetInfo(query) else {
+            subnetMaskError = "Enter a valid IP address or CIDR first."
+            return
+        }
+        guard let calculated = current.recalculated(using: notation) else {
+            subnetMaskError = current.family == .v4
+                ? "Use a CIDR prefix from /0 to /32 or a contiguous IPv4 mask, such as 255.255.255.0."
+                : "Use an IPv6 CIDR prefix from /0 to /128."
+            return
+        }
+        query = "\(calculated.address)/\(calculated.prefixLength)"
+        splitPrefix = 0
+        subnetMaskInput = ""
+        subnetMaskError = nil
+    }
 
     func run(_ mode: AppMode) {
         switch mode {
-        case .lookup: lookup()
-        case .geolocate: locate()
+        case .lookup:
+            lookup()
+            locate()
+        case .reputation: checkReputation()
         case .network: startNetTool()
+        case .speedtest: startSpeedTest()
         case .subnet: break
         }
     }
 
     func isBusy(_ mode: AppMode) -> Bool {
-        mode == .lookup ? isLoading : (mode == .geolocate ? isLocating : false)
+        mode == .lookup ? (isLoading || isLocating) : (mode == .reputation ? isCheckingReputation : false)
+    }
+
+    func saveReputationKey() {
+        reputationKeyStatus = nil
+        reputationKeyError = nil
+        do {
+            try reputationKeyStore.save(reputationKeyInput)
+            reputationKeyInput = ""
+            reputationKeyStatus = "API key saved in Keychain."
+        } catch {
+            reputationKeyError = error.localizedDescription
+        }
+    }
+
+    func removeReputationKey() {
+        reputationKeyStatus = nil
+        reputationKeyError = nil
+        do {
+            try reputationKeyStore.delete()
+            reputationTask?.cancel()
+            isCheckingReputation = false
+            reputationResult = nil
+            reputationError = nil
+            reputationKeyInput = ""
+            reputationKeyStatus = "API key removed."
+        } catch {
+            reputationKeyError = error.localizedDescription
+        }
+    }
+
+    func checkReputation() {
+        reputationTask?.cancel()
+        reputationResult = nil
+        reputationError = nil
+        isCheckingReputation = false
+        let input = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try ReputationRequest.address(input)
+            guard let key = try reputationKeyStore.load() else { throw ReputationError.missingKey }
+            isCheckingReputation = true
+            reputationTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let result = try await reputationClient.check(input, apiKey: key)
+                    guard !Task.isCancelled else { return }
+                    reputationResult = result
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    reputationError = error.localizedDescription
+                }
+                isCheckingReputation = false
+            }
+        } catch {
+            reputationError = error.localizedDescription
+        }
     }
 
     /// Finds this Mac's public IP, puts it in the query field, and runs the current tool with it.
@@ -88,7 +234,7 @@ final class LookupModel: ObservableObject {
                 myIP = r
                 if let ip = r.preferred {
                     query = ip
-                    if mode != .network { run(mode) }
+                    if mode != .network && mode != .speedtest { run(mode) }
                 }
             } catch {
                 guard !Task.isCancelled else { return }
@@ -171,9 +317,9 @@ final class LookupModel: ObservableObject {
 
     func locate() {
         let input = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !input.isEmpty else { return }
         geoTask?.cancel()
         isLocating = true
+        geoResult = nil
         geoError = nil
         geoTask = Task { [weak self] in
             guard let self else { return }
@@ -192,9 +338,9 @@ final class LookupModel: ObservableObject {
 
     func lookup() {
         let input = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !input.isEmpty else { return }
         task?.cancel()
         isLoading = true
+        result = nil
         errorMessage = nil
         task = Task { [weak self] in
             guard let self else { return }
@@ -221,10 +367,13 @@ final class LookupModel: ObservableObject {
 
 struct ModePicker: View {
     @Binding var mode: AppMode
+    var compact = false
 
     var body: some View {
         Picker("Mode", selection: $mode) {
-            ForEach(AppMode.allCases) { Text($0.title).tag($0) }
+            ForEach(AppMode.allCases) {
+                Text(compact && $0 == .subnet ? "Subnet" : $0.title).tag($0)
+            }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -242,8 +391,9 @@ struct QueryField: View {
         switch mode {
         case .lookup: return "IP address or CIDR, e.g. 8.8.8.8 or 2001:db8::/32"
         case .subnet: return "e.g. 192.168.1.10/24, 10.0.0.1 255.255.255.0, 2001:db8::/48"
-        case .geolocate: return "IP address, e.g. 8.8.8.8 or 2606:4700:4700::1111"
+        case .reputation: return "Public IP or CIDR (network address only), e.g. 8.8.8.8"
         case .network: return "IP address or hostname, e.g. 8.8.8.8 or apple.com"
+        case .speedtest: return ""
         }
     }
 
@@ -269,7 +419,7 @@ struct QueryField: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(!model.netRunning && model.query.trimmingCharacters(in: .whitespaces).isEmpty)
             } else if mode != .subnet {
-                Button(mode == .lookup ? "Look Up" : "Locate") { model.run(mode) }
+                Button(mode == .reputation ? "Check" : "Look Up") { model.run(mode) }
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.isBusy(mode) || model.query.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -443,6 +593,7 @@ struct SubnetCalculatorView: View {
         let subnets = info.subnets(prefix: effective, limit: Self.subnetLimit)
 
         return VStack(alignment: .leading, spacing: 10) {
+            subnetControls(info)
             HStack {
                 Text(info.network.description).font(.title3.bold()).textSelection(.enabled)
                 Spacer()
@@ -489,6 +640,37 @@ struct SubnetCalculatorView: View {
         }
     }
 
+    private func subnetControls(_ info: SubnetInfo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Picker("CIDR", selection: Binding(
+                    get: { info.prefixLength },
+                    set: { model.applySubnetNotation("/\($0)") }
+                )) {
+                    ForEach(0...info.bitWidth, id: \.self) { prefix in
+                        Text("/\(prefix)").tag(prefix)
+                    }
+                }
+                .fixedSize()
+                TextField(info.family == .v4 ? "Mask or CIDR, e.g. 255.255.255.0 or /24" : "CIDR, e.g. /64",
+                          text: $model.subnetMaskInput)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.applySubnetNotation(model.subnetMaskInput) }
+                Button("Calculate") { model.applySubnetNotation(model.subnetMaskInput) }
+                    .disabled(model.subnetMaskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .controlSize(compact ? .small : .regular)
+            Text("Change the prefix or enter a mask/CIDR to recalculate using the same IP address. Use Split into below to list smaller subnets.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let error = model.subnetMaskError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     @ViewBuilder private func subnetList(_ subnets: [CIDR]) -> some View {
         let rows = LazyVStack(alignment: .leading, spacing: 2) {
             ForEach(subnets, id: \.self) { subnet in
@@ -528,15 +710,7 @@ struct GeolocateView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         if let geo = model.geoResult {
-            if !compact { Divider() }
             details(geo)
-        } else if !compact {
-            Spacer()
-            Text("Enter a public IPv4 or IPv6 address to estimate its geographic location.")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-            Spacer()
         }
     }
 
@@ -590,6 +764,128 @@ struct GeolocateView: View {
             }
         }
         .font(compact ? .callout : .body)
+    }
+}
+
+struct CombinedLookupView: View {
+    @ObservedObject var model: LookupModel
+    let compact: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Owner").font(.headline)
+                StatusView(model: model)
+                if let result = model.result { OwnerSummary(result: result) }
+                Divider()
+                Text("Geolocation").font(.headline)
+                GeolocateView(model: model, compact: compact)
+                if let result = model.result {
+                    Divider()
+                    OwnedListHeader(model: model, result: result)
+                    if compact {
+                        LazyVStack(alignment: .leading, spacing: 6) {
+                            ForEach(result.ownedNetworks) { row in
+                                HStack {
+                                    Text(row.cidrText).font(.callout.monospaced()).textSelection(.enabled)
+                                    Spacer()
+                                    Text(row.networkName ?? "").foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                        }
+                    } else {
+                        Table(result.ownedNetworks) {
+                            TableColumn("CIDR") { Text($0.cidrText).font(.system(.body, design: .monospaced)) }
+                                .width(min: 160, ideal: 220)
+                            TableColumn("Network Name") { Text($0.networkName ?? "") }
+                            TableColumn("Handle") { Text($0.handle ?? "") }
+                        }
+                        .frame(height: 240)
+                    }
+                }
+                if model.result == nil && model.geoResult == nil && !model.isBusy(.lookup) {
+                    Text("Enter an IP address or CIDR and choose Look Up to find its owner, registered networks, and estimated location.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text("Look Up sends the address to public registries and geolocation providers. CIDRs are geolocated by their network address.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 8)
+        }
+        .frame(maxHeight: compact ? 460 : .infinity)
+    }
+}
+
+struct ReputationView: View {
+    @ObservedObject var model: LookupModel
+    let compact: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("IP Reputation · AbuseIPDB").font(.headline)
+                Text("Checks community abuse reports from the last 90 days. A CIDR checks only its network address, not every host.")
+                    .font(.callout).foregroundStyle(.secondary)
+                if model.isCheckingReputation {
+                    HStack {
+                        ProgressView().controlSize(.small)
+                        Text("Checking AbuseIPDB…").foregroundStyle(.secondary)
+                    }
+                }
+                if let error = model.reputationError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                }
+                if let result = model.reputationResult {
+                    HStack {
+                        Text("Abuse confidence: \(result.abuseConfidenceScore)%").font(.title3.bold())
+                        Spacer()
+                        Button { copyToPasteboard(result.summaryText) } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                    }
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+                        ForEach(result.rows) { row in
+                            GridRow {
+                                Text(row.label).foregroundStyle(.secondary)
+                                Text(row.value).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                    .font(compact ? .callout : .body)
+                    Text("A low score or no reports does not prove an address is safe. Reputation is not a guarantee and can change.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Divider()
+                Text("AbuseIPDB API key").font(.headline)
+                SecureField("Paste a new API key to save or replace it", text: $model.reputationKeyInput)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(model.isCheckingReputation)
+                HStack {
+                    Button("Save Key") { model.saveReputationKey() }
+                        .disabled(model.reputationKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isCheckingReputation)
+                    Button("Remove Key") { model.removeReputationKey() }
+                    Spacer()
+                    Link("Get an API key", destination: URL(string: "https://www.abuseipdb.com/account/api")!)
+                }
+                .controlSize(compact ? .small : .regular)
+                if let error = model.reputationKeyError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                }
+                if let status = model.reputationKeyStatus {
+                    Text(status).foregroundStyle(.secondary)
+                }
+                Text("Saved keys are reused from macOS Keychain and never displayed. Check sends the queried IP and your key only to AbuseIPDB over HTTPS. Your account's API limits apply; no reports are submitted.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, 8)
+        }
+        .frame(maxHeight: compact ? 460 : .infinity)
     }
 }
 
@@ -832,48 +1128,31 @@ struct MainView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ModePicker(mode: $mode)
-            QueryField(model: model, mode: mode, focusOnAppear: true)
+            if mode != .speedtest {
+                QueryField(model: model, mode: mode, focusOnAppear: true)
+            }
             HStack(alignment: .top, spacing: 20) {
                 Toggle("Show as menu bar icon when minimized", isOn: $menuBarWhenMinimized)
                     .toggleStyle(.checkbox)
                 LaunchAtLoginToggle()
             }
-            if mode == .subnet {
+            if mode == .speedtest {
+                SpeedTestView(model: model, compact: false)
+            } else if mode == .subnet {
                 Divider()
                 SubnetCalculatorView(model: model, compact: false)
-            } else if mode == .geolocate {
-                GeolocateView(model: model, compact: false)
+            } else if mode == .reputation {
+                ReputationView(model: model, compact: false)
             } else if mode == .network {
                 NetToolView(model: model, compact: false)
             } else {
-                lookupContent
+                CombinedLookupView(model: model, compact: false)
             }
         }
         .padding(16)
         .frame(minWidth: 560, minHeight: 420)
     }
 
-    @ViewBuilder private var lookupContent: some View {
-        StatusView(model: model)
-        if let result = model.result {
-            Divider()
-            OwnerSummary(result: result)
-            OwnedListHeader(model: model, result: result)
-            Table(result.ownedNetworks) {
-                TableColumn("CIDR") { Text($0.cidrText).font(.system(.body, design: .monospaced)) }
-                    .width(min: 160, ideal: 220)
-                TableColumn("Network Name") { Text($0.networkName ?? "") }
-                TableColumn("Handle") { Text($0.handle ?? "") }
-            }
-        } else {
-            Spacer()
-            Text("Enter an IPv4/IPv6 address or CIDR to find its registered owner and every network block registered to that owner.")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-            Spacer()
-        }
-    }
 }
 
 struct PopoverView: View {
@@ -884,28 +1163,20 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ModePicker(mode: $mode).controlSize(.small)
-            QueryField(model: model, mode: mode, focusOnAppear: true)
-            if mode == .subnet {
+            ModePicker(mode: $mode, compact: true).controlSize(.small)
+            if mode != .speedtest {
+                QueryField(model: model, mode: mode, focusOnAppear: true)
+            }
+            if mode == .speedtest {
+                SpeedTestView(model: model, compact: true)
+            } else if mode == .subnet {
                 SubnetCalculatorView(model: model, compact: true)
-            } else if mode == .geolocate {
-                GeolocateView(model: model, compact: true)
+            } else if mode == .reputation {
+                ReputationView(model: model, compact: true)
             } else if mode == .network {
                 NetToolView(model: model, compact: true)
             } else {
-                StatusView(model: model)
-                if let result = model.result {
-                    OwnerSummary(result: result)
-                    OwnedListHeader(model: model, result: result)
-                    List(result.ownedNetworks) { row in
-                        HStack {
-                            Text(row.cidrText).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                            Spacer()
-                            Text(row.networkName ?? "").foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    .frame(height: min(CGFloat(result.ownedNetworks.count) * 24 + 12, 260))
-                }
+                CombinedLookupView(model: model, compact: true)
             }
             HStack {
                 Button("Open Window", action: openWindow)
@@ -944,6 +1215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [Settings.menuBarWhenMinimizedKey: true])
+        Settings.migrateMode()
         NSApp.mainMenu = buildMainMenu()
 
         window = MainWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
@@ -975,6 +1247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model.stopNetTool()
+        model.stopSpeedTest()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

@@ -1,14 +1,17 @@
 # IP Toolkit for macOS
 
-A native macOS 13+ app (Apple Silicon and Intel) with four tools for an IPv4/IPv6
+A native macOS 13+ app (Apple Silicon and Intel) with five tools for an IPv4/IPv6
 address or CIDR:
 
-- **Owner Lookup:** shows who it is registered to and lists every CIDR block
-  registered to that same owner.
+- **IP Lookup:** shows the registered owner, every CIDR block registered to
+  that owner, and the estimated geographic location with a map.
 - **Subnet Calculator:** offline subnet math and splitting.
-- **Geolocate:** estimates the address's physical location and shows it on a map.
+- **Reputation:** checks AbuseIPDB abuse confidence and community reports using
+  your API key, stored in macOS Keychain.
 - **Network:** runs ping, traceroute, or an nmap port scan against an address,
   hostname, or (for port scans) a small CIDR range, with live output.
+- **Speed Test:** estimates this Mac's internet download/upload speeds and HTTPS
+  latency using Cloudflare, without installing extra tools.
 
 ## Use
 
@@ -22,6 +25,8 @@ The window shows:
 - The network block that contains your input.
 - A table of every CIDR registered to that owner, with network names and handles.
   **Copy CIDRs** puts the list on the clipboard, one per line.
+- Estimated geolocation and a map, on the same tab. Ownership and geolocation
+  load independently; either result remains available if the other service fails.
 
 ### Open at login
 
@@ -39,7 +44,7 @@ The login item points to the app's current location, so if you move the app
 
 The **My IP** button next to the input box (in every tool, including the menu bar
 box) finds this Mac's public internet address. It fills it in and runs the
-current tool, so you can see your own owner, subnet, or location in one click.
+current tool, so you can see your own owner, subnet, location, or reputation in one click.
 In **Network** the address is only filled in, not started. Your public IPv4 and IPv6
 addresses are shown under the input with copy buttons. "no IPv6" means your
 network doesn't have IPv6 internet access.
@@ -77,6 +82,15 @@ The input box is shared, so switching modes keeps what you typed.
 Accepted input: `192.168.1.10/24`, `10.0.0.1 255.255.255.0`, `10.0.0.1/255.255.255.0`,
 `2001:db8::1/48`, or a bare address (treated as /32 or /128).
 
+To calculate a different subnet around the same IP, select a prefix in the
+**CIDR** picker, or enter a dotted IPv4 mask (`255.255.255.192`) or prefix
+(`/26` or `26`) in the **Mask or CIDR** field and choose **Calculate** (or press
+Return in that field). IPv6 uses prefix lengths from /0 to /128; IPv4 supports
+/0 to /32 and contiguous netmasks. The original host address is preserved,
+results update immediately, and any previous split selection is reset.
+Invalid masks show an error without replacing the current calculation.
+These controls are also available in the menu bar popover.
+
 - **IPv4:** network, netmask, wildcard mask, broadcast, first/last usable host,
   total addresses, usable hosts, address type, legacy class, and binary
   address/netmask. /31 (point-to-point, RFC 3021) and /32 are handled.
@@ -88,10 +102,11 @@ Accepted input: `192.168.1.10/24`, `10.0.0.1 255.255.255.0`, `10.0.0.1/255.255.2
   length. Up to 1,024 subnets are listed.
 - **Copy Details** and **Copy Subnets** copy the results as plain text.
 
-### Geolocate
+### IP Lookup: owner and geolocation
 
-Switch to **Geolocate**, enter a public IPv4 or IPv6 address (a CIDR is located
-by its network address), and press Return or click **Locate**. The result shows
+Switch to **IP Lookup**, enter a public IPv4 or IPv6 address (a CIDR is located
+by its network address), and press Return or click **Look Up**. Alongside the
+owner and registered CIDRs, the geolocation result shows
 city, region, country, postal code, coordinates, time zone, organization, ASN,
 and hostname, plus a map pin. **Open in Maps** opens the location in Apple Maps;
 **Copy** copies the details.
@@ -106,8 +121,59 @@ and hostname, plus a map pin. **Open in Maps** opens the location in Apple Maps;
 - IP geolocation is an estimate, usually accurate to city or region at best.
   Anycast addresses (for example `8.8.8.8`, `1.1.1.1`) are served from many sites;
   the app flags these.
-- Private, loopback, link-local, documentation, and other non-public addresses
-  are rejected locally without contacting any service.
+- Geolocation rejects private, loopback, link-local, documentation, and other
+  non-public addresses locally without contacting a geolocation service.
+
+### IP reputation
+
+Switch to **Reputation** in the window or menu bar input box. Get an API key
+from [your AbuseIPDB account](https://www.abuseipdb.com/account/api), paste it in
+the secure field, and choose **Save Key**. Enter a public IP and choose **Check**.
+The key is saved in macOS Keychain (not preferences or source files), reused on
+future launches, and never displayed again. **Save Key** replaces it;
+**Remove Key** deletes it and cancels a running check. macOS may prompt for
+Keychain access, especially after changing the app's signing identity.
+
+- Shows AbuseIPDB's abuse confidence (0–100%), reports in the last 90 days,
+  distinct reporters, last report timestamp, and available ISP/domain/country,
+  usage type, allowlist and Tor information. **Copy** copies these details.
+- IPv4 and IPv6 are supported. A CIDR checks **only its network address**,
+  not the reputation of the entire network. Invalid and non-public inputs are
+  rejected locally.
+- A zero score or no reports does **not** prove an address is safe. Scores
+  reflect community reports and can change; they are not a definitive verdict.
+- **Privacy:** a check sends the queried IP and your API key to AbuseIPDB over
+  HTTPS. The key is sent in a header, not a URL; redirects are not followed.
+  Checks are read-only: the app never submits abuse reports.
+- Your account's API quotas apply. Authentication, rate-limit, network and
+  response errors are shown explicitly. Reputation is not automatically checked
+  when using **IP Lookup**, so ordinary lookups do not consume this quota.
+
+### Speed Test
+
+Select **Speed Test**, then **Start Speed Test**. No target address, API key,
+or additional installation is needed. The tab is also available in the menu bar
+popover; switching tabs does not stop a test. **Stop** cancels the active test,
+and **Copy Results** copies a completed result with its timestamp.
+
+Each completed test transfers approximately **36 MB** of payload (30 MB
+download and 6 MB upload), plus protocol overhead. Avoid testing on metered
+connections. Tests never start automatically when you open the tab or use My IP.
+Cloudflare sees your public IP and test traffic at `speed.cloudflare.com`.
+Uploads contain generated test data, never local files.
+
+This is a lightweight, single-connection HTTPS estimate, **not** the official
+Cloudflare browser speed-test implementation. It warms up the connection,
+measures median latency across five small HTTPS requests, then averages
+throughput over three 10 MB downloads and three 2 MB uploads using total transfer
+time. Results include HTTP overhead, so fast connections may be understated.
+Latency is HTTP request/response time, not ICMP ping. VPNs, Wi-Fi, and competing
+traffic affect results. Progress counts completed requests, not elapsed time;
+each request has a 30-second total timeout. Failed transfers show an error,
+not a completed result.
+
+Speed-test regression tests use mock HTTP responses. To explicitly run a real
+Cloudflare test (approximately 36 MB), use `bash test.sh --speedtest-live`.
 
 ### Network: Ping, Traceroute and Port Scan
 
@@ -176,11 +242,49 @@ Limitations:
 
 Requires Xcode or the Xcode Command Line Tools.
 
+### Xcode
+
+Open [IP Toolkit.xcodeproj](./IP%20Toolkit.xcodeproj) in full Xcode, select the
+**IP Toolkit** scheme and **My Mac**, then press **Run** (Command-R).
+The project references the existing sources directly; no source export or copy
+is needed. Debug builds target the current Mac; Release builds and
+**Product > Archive** produce a universal Apple Silicon/Intel app for macOS 13+.
+
+The project uses the existing Info.plist and generates the magnifying-glass/IP
+icon with the same drawing code as the command-line build. Signing defaults to
+local ad-hoc signing, with no Apple Developer account required. For Developer ID
+distribution, configure your signing identity/team and notarization separately.
+App Sandbox is off so the existing ping, traceroute and nmap subprocesses work.
+Build-script sandboxing is off because icon generation invokes the Swift compiler
+and reads the installed SDK.
+
+You can also build from Terminal with full Xcode selected:
+
+```sh
+xcodebuild -project "IP Toolkit.xcodeproj" -scheme "IP Toolkit" \
+  -configuration Release -derivedDataPath build/Xcode build
+```
+
+The app is then at `build/Xcode/Build/Products/Release/IP Toolkit.app`.
+If `xcode-select -p` points to Command Line Tools instead of full Xcode, prefix
+the command with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`
+(adjust for your Xcode installation).
+
+The existing tests remain a command-line harness, not an XCTest target; run
+`bash test.sh` or `bash test.sh --live` from the project directory.
+
+### Command-line scripts
+
+The original build and test scripts remain available without full Xcode:
+
 ```sh
 bash build.sh        # builds dist/IP Toolkit.app and a ZIP
 bash test.sh         # offline unit tests + bundle checks
 bash test.sh --live  # also queries live registries, geolocation, ping, traceroute and nmap (localhost)
 ```
+
+Reputation tests use mocked HTTP responses with a dummy key; they do not need
+an AbuseIPDB account or consume its quota.
 
 The app is ad-hoc signed, which is suitable for local use. On another Mac,
 Gatekeeper may require right-click → **Open** the first time.

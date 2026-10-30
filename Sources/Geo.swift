@@ -139,12 +139,16 @@ enum GeoParser {
 actor GeoClient {
     private let session: URLSession
 
-    init() {
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+            return
+        }
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
         config.httpAdditionalHeaders = ["User-Agent": "IPToolkit/1.0 (macOS)", "Accept": "application/json"]
-        session = URLSession(configuration: config)
+        self.session = URLSession(configuration: config)
     }
 
     /// Accepts an address, or a CIDR (its network address is located).

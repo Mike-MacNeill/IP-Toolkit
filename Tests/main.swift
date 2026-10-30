@@ -123,6 +123,27 @@ check(row(s24, "Address type") == "Private (RFC 1918)" && row(s24, "Legacy class
 check(row(s24, "Binary netmask") == "11111111.11111111.11111111.00000000", "Binary netmask")
 check(row(s24, "Binary address") == "11000000.10101000.00000001.00001010", "Binary address")
 
+let changingSubnet = SubnetInfo("192.168.1.200/24")!
+for notation in ["/26", "26", "255.255.255.192"] {
+    let calculated = changingSubnet.recalculated(using: notation)
+    check(calculated?.address.description == "192.168.1.200", "Recalculation preserves host for \(notation)")
+    check(calculated?.network.description == "192.168.1.192/26", "Recalculation network for \(notation)")
+    check(calculated?.usableHosts == "62", "Recalculation usable hosts for \(notation)")
+    check(calculated?.broadcast?.description == "192.168.1.255", "Recalculation broadcast for \(notation)")
+}
+check(changingSubnet.recalculated(using: "/16")?.network.description == "192.168.0.0/16", "Recalculate larger subnet")
+check(changingSubnet.recalculated(using: "0.0.0.0")?.prefixLength == 0, "Recalculate zero mask")
+check(changingSubnet.recalculated(using: "255.255.255.255")?.usableHosts == "1", "Recalculate host mask")
+for notation in ["", "/", "/33", "-1", "255.0.255.0", "24/25", "word", "ffff::"] {
+    check(changingSubnet.recalculated(using: notation) == nil, "Reject recalculation notation \(notation)")
+}
+let changingV6 = SubnetInfo("2001:db8:abcd:1234::99/48")!
+check(changingV6.recalculated(using: "/64")?.network.description == "2001:db8:abcd:1234::/64", "IPv6 recalculation")
+check(changingV6.recalculated(using: "128")?.address == changingV6.address, "IPv6 host preserved")
+check(changingV6.recalculated(using: "/0")?.prefixLength == 0, "IPv6 zero prefix")
+check(changingV6.recalculated(using: "/129") == nil, "Reject oversized IPv6 prefix")
+check(changingV6.recalculated(using: "255.255.255.0") == nil, "Reject IPv4 mask for IPv6")
+
 check(SubnetInfo("10.0.0.1 255.255.240.0")?.network.description == "10.0.0.0/20", "Space netmask")
 check(SubnetInfo("10.0.0.1/255.255.255.128")?.network.description == "10.0.0.0/25", "Slash netmask")
 check(SubnetInfo("10.0.0.1 255.0.255.0") == nil, "Reject non-contiguous mask")
@@ -302,6 +323,185 @@ check(MyIPParser.address(from: "", family: .v4) == nil, "My IP empty rejected")
 check(MyIPResult(ipv4: nil, ipv6: "2001:db8::1").preferred == "2001:db8::1", "My IP prefers v6 when no v4")
 check(MyIPResult(ipv4: "1.2.3.4", ipv6: "2001:db8::1").preferred == "1.2.3.4", "My IP prefers v4")
 check(MyIPResult(ipv4: "1.2.3.4", ipv6: nil).summaryText == "IPv4: 1.2.3.4", "My IP summary")
+
+// MARK: Reputation (offline; never uses a real API key)
+check(try! ReputationRequest.address("8.8.8.7/24").description == "8.8.8.0", "Reputation checks CIDR network address")
+check(try! ReputationRequest.address("2606:4700:4700::1111").family == .v6, "Reputation IPv6")
+for input in ["", "example.com", "-oops", "8.8.8.8/33", "10.1.2.3", "127.0.0.1", "::1", "192.0.2.1", "fc00::1"] {
+    check((try? ReputationRequest.address(input)) == nil, "Reputation rejects invalid/non-public input \(input)")
+}
+check(try! ReputationRequest.validatedKey(" test-key\n") == "test-key", "Reputation key trimmed")
+for key in ["", " \n", "a b", "a\nb", "a\rb", "key\u{7f}", "\u{00e9}"] {
+    check((try? ReputationRequest.validatedKey(key)) == nil, "Reputation rejects empty/invalid key")
+}
+let reputationRequest = try! ReputationRequest.build(input: "2606:4700:4700::1111", apiKey: "test-key")
+let reputationURL = URLComponents(url: reputationRequest.url!, resolvingAgainstBaseURL: false)!
+check(reputationURL.scheme == "https" && reputationURL.host == "api.abuseipdb.com" && reputationURL.path == "/api/v2/check",
+      "Reputation HTTPS check endpoint")
+check(reputationURL.queryItems == [URLQueryItem(name: "ipAddress", value: "2606:4700:4700::1111"),
+                                   URLQueryItem(name: "maxAgeInDays", value: "90")], "Reputation query parameters")
+check(reputationRequest.value(forHTTPHeaderField: "Key") == "test-key"
+      && reputationRequest.value(forHTTPHeaderField: "Accept") == "application/json", "Reputation auth header")
+check(!reputationRequest.url!.absoluteString.contains("test-key"), "Reputation key absent from URL")
+
+let reputationJSON = """
+{"data":{"ipAddress":"8.8.8.8","isPublic":true,"abuseConfidenceScore":72,"totalReports":15,
+"numDistinctUsers":9,"lastReportedAt":"2026-10-20T12:00:00+00:00","countryCode":"US",
+"usageType":"Data Center/Web Hosting/Transit","isp":"Example ISP","domain":"example.com",
+"isWhitelisted":null,"isTor":false}}
+"""
+let reputationData = Data(reputationJSON.utf8)
+func reputationResponse(_ status: Int, headers: [String: String] = [:]) -> HTTPURLResponse {
+    HTTPURLResponse(url: URL(string: "https://api.abuseipdb.com/api/v2/check")!,
+                    statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+}
+let reputationIP = IPAddress("8.8.8.8")!
+let reputation = try! ReputationRequest.decode(reputationData, response: reputationResponse(200), expectedIP: reputationIP)
+check(reputation.abuseConfidenceScore == 72 && reputation.totalReports == 15 && reputation.numDistinctUsers == 9,
+      "Reputation score and report counts")
+check(reputation.isWhitelisted == nil && reputation.isTor == false, "Reputation nullable allowlist")
+check(reputation.summaryText.contains("Source: AbuseIPDB") && reputation.summaryText.contains("72%"),
+      "Reputation copy includes provider and score")
+let noReportsData = Data("""
+{"data":{"ipAddress":"8.8.8.8","isPublic":true,"abuseConfidenceScore":0,"totalReports":0,
+"numDistinctUsers":0,"lastReportedAt":null}}
+""".utf8)
+let noReports = try! ReputationRequest.decode(noReportsData, response: reputationResponse(200), expectedIP: reputationIP)
+check(noReports.lastReportedAt == nil && noReports.rows.contains { $0.label == "Last reported" && $0.value == "Never" },
+      "Reputation no reports and optional metadata")
+for (status, expected) in [(401, ReputationError.http(401)), (403, .http(403)), (422, .http(422)),
+                            (500, .http(500)), (302, .http(302)), (429, .rateLimited("60"))] {
+    do {
+        _ = try ReputationRequest.decode(reputationData, response: reputationResponse(status, headers: ["Retry-After": "60"]),
+                                        expectedIP: reputationIP)
+        check(false, "Reputation should reject HTTP \(status)")
+    } catch { check(error as? ReputationError == expected, "Reputation HTTP \(status) error") }
+}
+for invalid in [
+    "<html>error</html>", "{}", "{\"data\":null}",
+    reputationJSON.replacingOccurrences(of: "\"abuseConfidenceScore\":72", with: "\"abuseConfidenceScore\":101"),
+    reputationJSON.replacingOccurrences(of: "\"totalReports\":15", with: "\"totalReports\":-1"),
+    reputationJSON.replacingOccurrences(of: "\"ipAddress\":\"8.8.8.8\"", with: "\"ipAddress\":\"1.1.1.1\""),
+    reputationJSON.replacingOccurrences(of: "\"isPublic\":true", with: "\"isPublic\":false")
+] {
+    do {
+        _ = try ReputationRequest.decode(Data(invalid.utf8), response: reputationResponse(200), expectedIP: reputationIP)
+        check(false, "Reputation should reject malformed or mismatched response")
+    } catch { check(error as? ReputationError == .invalidResponse, "Reputation invalid response error") }
+}
+
+final class ReputationMockProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard request.url?.host == "api.abuseipdb.com", request.value(forHTTPHeaderField: "Key") == "test-key" else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        if request.url?.query?.contains("1.1.1.1") == true {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+        } else {
+            client?.urlProtocol(self, didReceive: reputationResponse(200), cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: reputationData)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+    override func stopLoading() {}
+}
+let reputationTestsDone = DispatchSemaphore(value: 0)
+Task {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ReputationMockProtocol.self]
+    let session = URLSession(configuration: configuration)
+    let client = ReputationClient(session: session)
+    do {
+        let result = try await client.check("8.8.8.8", apiKey: "test-key")
+        check(result == reputation, "Reputation client round trip with mocked HTTP")
+    } catch { check(false, "Reputation mock request failed: \(error)") }
+    do {
+        _ = try await client.check("1.1.1.1", apiKey: "test-key")
+        check(false, "Reputation should surface network errors")
+    } catch {
+        check((error as? URLError)?.code == .notConnectedToInternet, "Reputation transport errors preserved")
+    }
+    session.invalidateAndCancel()
+    reputationTestsDone.signal()
+}
+check(reputationTestsDone.wait(timeout: .now() + 10) == .success, "Reputation mock tests complete")
+
+// MARK: Speed test
+check(try! SpeedTestMath.mbps(bytes: 10_000_000, seconds: 2) == 40, "Speed conversion uses decimal megabits")
+check(try! SpeedTestMath.median([9, 1, 5]) == 5, "Latency median odd")
+check(try! SpeedTestMath.median([8, 2, 4, 6]) == 5, "Latency median even")
+check((try? SpeedTestMath.median([])) == nil, "Reject empty latency samples")
+check((try? SpeedTestMath.median([.nan])) == nil, "Reject invalid latency")
+check((try? SpeedTestMath.mbps(bytes: 1, seconds: 0)) == nil, "Reject zero duration")
+check((try? SpeedTestMath.mbps(bytes: 1, seconds: .infinity)) == nil, "Reject infinite duration")
+check(SpeedTestProgress(completed: 6, total: 12, phase: "Test").fraction == 0.5, "Speed test progress")
+
+final class SpeedMockProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let url = request.url, url.host == "speed.cloudflare.com",
+              request.value(forHTTPHeaderField: "Accept-Encoding") == "identity",
+              URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "requestId" }) == true else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        let scenario = request.value(forHTTPHeaderField: "X-Test-Scenario") ?? "success"
+        let upload = request.httpMethod == "POST"
+        let count = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "bytes" })?.value.flatMap(Int.init) ?? 0
+        let response = HTTPURLResponse(url: url, statusCode: scenario == "http" ? 429 : 200,
+                                       httpVersion: "HTTP/1.1",
+                                       headerFields: ["cf-meta-upload-bytes": String(scenario == "bad-upload" ? 0 : SpeedTestClient.uploadBytes)])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if !upload { client?.urlProtocol(self, didLoad: Data(repeating: 0, count: scenario == "short" ? 0 : count)) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+let speedTestsDone = DispatchSemaphore(value: 0)
+Task {
+    for scenario in ["success", "http", "short", "bad-upload"] {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [SpeedMockProtocol.self]
+        config.httpAdditionalHeaders = ["X-Test-Scenario": scenario]
+        let session = URLSession(configuration: config)
+        do {
+            let result = try await SpeedTestClient(session: session).run { _ in }
+            check(scenario == "success", "Speed errors do not produce success: \(scenario)")
+            check(result.downloadMbps > 0 && result.uploadMbps > 0 && result.latencyMS > 0, "Positive speed metrics")
+            check(result.summaryText.contains("Mbps") && result.summaryText.contains("HTTP latency"), "Speed copy output units")
+        } catch {
+            check(scenario != "success", "Speed success round trip: \(error)")
+            switch (scenario, error) {
+            case ("http", SpeedTestError.http(429)),
+                 ("short", SpeedTestError.incompleteTransfer),
+                 ("bad-upload", SpeedTestError.incompleteTransfer): break
+            default: check(false, "Unexpected speed error \(scenario): \(error)")
+            }
+        }
+        session.invalidateAndCancel()
+    }
+    let task = Task {
+        try Task.checkCancellation()
+        return try await SpeedTestClient().run { _ in }
+    }
+    task.cancel()
+    do { _ = try await task.value; check(false, "Cancelled speed test cannot succeed") }
+    catch { check(error is CancellationError || (error as? URLError)?.code == .cancelled, "Speed cancellation propagated") }
+    if CommandLine.arguments.contains("--speedtest-live") {
+        do {
+            let result = try await SpeedTestClient().run { print("LIVE speed: \($0.phase)") }
+            print(result.summaryText)
+            check(result.downloadMbps > 0 && result.uploadMbps > 0 && result.latencyMS > 0, "Live Cloudflare speed metrics")
+        } catch { check(false, "Live speed test: \(error)") }
+    }
+    speedTestsDone.signal()
+}
+check(speedTestsDone.wait(timeout: .now() + 420) == .success, "Speed tests complete")
 
 // MARK: Live registry checks (network required): run with --live
 if CommandLine.arguments.contains("--live") {

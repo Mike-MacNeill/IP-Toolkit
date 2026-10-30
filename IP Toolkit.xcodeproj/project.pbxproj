@@ -1,0 +1,360 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B10000000000000000000001 /* SpeedTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* SpeedTest.swift */; };
+		B10000000000000000000002 /* SpeedTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* SpeedTestView.swift */; };
+		A10000000000000000000014 /* Reputation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* Reputation.swift */; };
+		A10000000000000000000001 /* IPAddress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* IPAddress.swift */; };
+		A10000000000000000000002 /* RDAP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* RDAP.swift */; };
+		A10000000000000000000003 /* Subnet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* Subnet.swift */; };
+		A10000000000000000000004 /* Geo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* Geo.swift */; };
+		A10000000000000000000005 /* NetTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* NetTools.swift */; };
+		A10000000000000000000006 /* MyIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* MyIP.swift */; };
+		A10000000000000000000007 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* LaunchAtLogin.swift */; };
+		A10000000000000000000008 /* IconDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* IconDrawing.swift */; };
+		A10000000000000000000009 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* App.swift */; };
+		A1000000000000000000000A /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* main.swift */; };
+		A1000000000000000000000B /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* AppIcon.icns */; };
+		A1000000000000000000000C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* README.md */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B20000000000000000000001 /* SpeedTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTest.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* SpeedTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestView.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* Reputation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Reputation.swift; sourceTree = "<group>"; };
+		A20000000000000000000001 /* IPAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAddress.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* RDAP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RDAP.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* Subnet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subnet.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Geo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geo.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* NetTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetTools.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* MyIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyIP.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* IconDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconDrawing.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = DERIVED_FILE_DIR; };
+		A2000000000000000000000C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000E /* generate-xcode-icon.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "generate-xcode-icon.sh"; sourceTree = "<group>"; };
+		A2000000000000000000000F /* IP Toolkit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "IP Toolkit.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000010 /* build.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		A20000000000000000000011 /* test.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = test.sh; sourceTree = "<group>"; };
+		A20000000000000000000012 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* Sources */,
+				A40000000000000000000003 /* packaging */,
+				A40000000000000000000004 /* Tools */,
+				A40000000000000000000006 /* Tests */,
+				A2000000000000000000000C /* README.md */,
+				A20000000000000000000010 /* build.sh */,
+				A20000000000000000000011 /* test.sh */,
+				A40000000000000000000007 /* Generated */,
+				A40000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* IPAddress.swift */,
+				A20000000000000000000002 /* RDAP.swift */,
+				A20000000000000000000004 /* Geo.swift */,
+				A20000000000000000000014 /* Reputation.swift */,
+				B20000000000000000000001 /* SpeedTest.swift */,
+				B20000000000000000000002 /* SpeedTestView.swift */,
+				A20000000000000000000003 /* Subnet.swift */,
+				A20000000000000000000005 /* NetTools.swift */,
+				A20000000000000000000006 /* MyIP.swift */,
+				A20000000000000000000007 /* LaunchAtLogin.swift */,
+				A20000000000000000000008 /* IconDrawing.swift */,
+				A20000000000000000000009 /* App.swift */,
+				A2000000000000000000000A /* main.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* packaging */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000D /* Info.plist */,
+				A2000000000000000000000E /* generate-xcode-icon.sh */,
+			);
+			path = packaging;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* Tools */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000005 /* IconGenerator */,
+			);
+			path = Tools;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* IconGenerator */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000012 /* main.swift */,
+			);
+			path = IconGenerator;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000006 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000013 /* main.swift */,
+				A40000000000000000000009 /* App */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000009 /* App */ = {
+			isa = PBXGroup;
+			children = (A20000000000000000000015 /* main.swift */);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000007 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000B /* AppIcon.icns */,
+			);
+			name = Generated;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000F /* IP Toolkit.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* IP Toolkit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "IP Toolkit" */;
+			buildPhases = (
+				A30000000000000000000002 /* Generate App Icon */,
+				A30000000000000000000003 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A30000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IP Toolkit";
+			productName = "IP Toolkit";
+			productReference = A2000000000000000000000F /* IP Toolkit.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A60000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "IP Toolkit" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* IP Toolkit */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A30000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000B /* AppIcon.icns in Resources */,
+				A1000000000000000000000C /* README.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A30000000000000000000002 /* Generate App Icon */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/packaging/generate-xcode-icon.sh",
+				"$(SRCROOT)/Sources/IconDrawing.swift",
+				"$(SRCROOT)/Tools/IconGenerator/main.swift",
+			);
+			name = "Generate App Icon";
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/AppIcon.icns",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "bash \"$SRCROOT/packaging/generate-xcode-icon.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A30000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* IPAddress.swift in Sources */,
+				A10000000000000000000002 /* RDAP.swift in Sources */,
+				A10000000000000000000003 /* Subnet.swift in Sources */,
+				A10000000000000000000004 /* Geo.swift in Sources */,
+				A10000000000000000000014 /* Reputation.swift in Sources */,
+				B10000000000000000000001 /* SpeedTest.swift in Sources */,
+				B10000000000000000000002 /* SpeedTestView.swift in Sources */,
+				A10000000000000000000005 /* NetTools.swift in Sources */,
+				A10000000000000000000006 /* MyIP.swift in Sources */,
+				A10000000000000000000007 /* LaunchAtLogin.swift in Sources */,
+				A10000000000000000000008 /* IconDrawing.swift in Sources */,
+				A10000000000000000000009 /* App.swift in Sources */,
+				A1000000000000000000000A /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A80000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A80000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A80000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXECUTABLE_NAME = IPToolkit;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = packaging/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				PRODUCT_BUNDLE_IDENTIFIER = local.mmacneill.iptoolkit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		A80000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXECUTABLE_NAME = IPToolkit;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = packaging/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				PRODUCT_BUNDLE_IDENTIFIER = local.mmacneill.iptoolkit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A90000000000000000000001 /* Build configuration list for PBXProject "IP Toolkit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000001 /* Debug */,
+				A80000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "IP Toolkit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000000000000000000003 /* Debug */,
+				A80000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A60000000000000000000001 /* Project object */;
+}

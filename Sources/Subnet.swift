@@ -99,6 +99,13 @@ struct SubnetInfo {
         return 32 - host.nonzeroBitCount
     }
 
+    /// Recalculates around the original host address, not the normalized network address.
+    func recalculated(using notation: String) -> SubnetInfo? {
+        var suffix = notation.trimmingCharacters(in: .whitespacesAndNewlines)
+        if suffix.hasPrefix("/") { suffix.removeFirst() }
+        return SubnetInfo("\(address)/\(suffix)")
+    }
+
     var netmask: IPAddress { IPAddress(family: family, value: ~U128.lowBits(bitWidth - prefixLength)) }
     var wildcard: IPAddress { IPAddress(family: family, value: U128.lowBits(bitWidth - prefixLength)) }
 

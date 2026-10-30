@@ -5,7 +5,7 @@ BUILD="$ROOT/build"
 APP="$ROOT/dist/IP Toolkit.app"
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 SOURCES=("$ROOT/Sources/IPAddress.swift" "$ROOT/Sources/RDAP.swift" "$ROOT/Sources/Subnet.swift" "$ROOT/Sources/Geo.swift" "$ROOT/Sources/NetTools.swift" "$ROOT/Sources/MyIP.swift" "$ROOT/Sources/LaunchAtLogin.swift" "$ROOT/Sources/IconDrawing.swift"
-         "$ROOT/Sources/App.swift" "$ROOT/Sources/main.swift")
+         "$ROOT/Sources/Reputation.swift" "$ROOT/Sources/SpeedTest.swift" "$ROOT/Sources/SpeedTestView.swift" "$ROOT/Sources/App.swift" "$ROOT/Sources/main.swift")
 
 rm -rf "$APP"
 mkdir -p "$BUILD" "$APP/Contents/MacOS" "$APP/Contents/Resources"

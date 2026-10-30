@@ -5,8 +5,16 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$ROOT/build"
 xcrun swiftc -swift-version 5 -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
     "$ROOT/Sources/IPAddress.swift" "$ROOT/Sources/RDAP.swift" "$ROOT/Sources/Subnet.swift" "$ROOT/Sources/Geo.swift" "$ROOT/Sources/NetTools.swift" "$ROOT/Sources/MyIP.swift" "$ROOT/Tests/main.swift" \
-    -o "$ROOT/build/Tests"
+    "$ROOT/Sources/Reputation.swift" "$ROOT/Sources/SpeedTest.swift" -o "$ROOT/build/Tests"
 "$ROOT/build/Tests" "$@"
+
+APP_SOURCES=()
+for SOURCE in "$ROOT"/Sources/*.swift; do
+    if [ "$SOURCE" != "$ROOT/Sources/main.swift" ]; then APP_SOURCES+=("$SOURCE"); fi
+done
+xcrun swiftc -swift-version 5 -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+    "${APP_SOURCES[@]}" "$ROOT/Tests/App/main.swift" -o "$ROOT/build/AppTests"
+"$ROOT/build/AppTests"
 
 APP="$ROOT/dist/IP Toolkit.app"
 if [ -d "$APP" ]; then
