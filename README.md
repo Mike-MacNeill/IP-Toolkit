@@ -1,5 +1,7 @@
 # IP Toolkit for macOS
 
+A separate Windows desktop implementation is available in [Windows/README.md](Windows/README.md).
+
 A native macOS 13+ app (Apple Silicon and Intel) with five tools for an IPv4/IPv6
 address or CIDR:
 

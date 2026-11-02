@@ -1,0 +1,127 @@
+<Window x:Class="IPToolkit.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="IP Toolkit" Height="760" Width="920" MinHeight="560" MinWidth="700"
+  WindowStyle="SingleBorderWindow" ResizeMode="CanResize" ShowInTaskbar="True"
+  WindowStartupLocation="CenterScreen" Background="#F4F6F5">
+  <Grid Margin="22">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,16">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="IP Toolkit" FontSize="24" FontWeight="SemiBold" Foreground="#162A2A" />
+        <TextBlock Text="Network address utilities" Foreground="#617170" Margin="1,2,0,0" />
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+        <CheckBox x:Name="LoginCheckBox" Content="Open at login" VerticalAlignment="Center" Margin="0,0,14,0"
+                  Checked="Login_OnChanged" Unchecked="Login_OnChanged" />
+        <Button Content="My IP" Click="MyIp_OnClick" />
+        <Button Content="Minimize" Click="Minimize_OnClick" />
+        <Button x:Name="MaximizeButton" Content="Maximize" Click="Maximize_OnClick" />
+        <Button Content="Close" Click="Close_OnClick" />
+      </StackPanel>
+    </DockPanel>
+    <TabControl Grid.Row="1" x:Name="ToolsTabs" Background="White" Padding="8">
+      <TabItem Header="IP Lookup">
+        <Grid Margin="10">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Margin="0,0,0,12">
+            <TextBox x:Name="LookupInput" MinWidth="360" Height="34" FontSize="15" VerticalContentAlignment="Center"
+                     ToolTip="IPv4 or IPv6 address, or CIDR" KeyDown="LookupInput_OnKeyDown" />
+            <Button Content="Look Up" Click="Lookup_OnClick" />
+            <Button Content="Open Map" Click="OpenMap_OnClick" IsEnabled="False" x:Name="MapButton" />
+            <Button Content="Copy" Click="CopyLookup_OnClick" />
+          </DockPanel>
+          <TextBox x:Name="LookupOutput" Grid.Row="1" Style="{StaticResource OutputBox}" />
+          <TextBlock x:Name="LookupStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+        </Grid>
+      </TabItem>
+      <TabItem Header="Subnet Calculator">
+        <Grid Margin="10">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Margin="0,0,0,12">
+            <TextBox x:Name="SubnetInput" MinWidth="360" Height="34" FontSize="15" VerticalContentAlignment="Center"
+                     ToolTip="Address, CIDR, or IPv4 netmask" KeyDown="SubnetInput_OnKeyDown" />
+            <Button Content="Calculate" Click="Calculate_OnClick" />
+            <Button Content="Copy Details" Click="CopySubnet_OnClick" />
+          </DockPanel>
+          <DataGrid x:Name="ResultsGrid" Grid.Row="1" ItemsSource="{Binding Rows}" CanUserSortColumns="False">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Property" Binding="{Binding Label}" Width="200" />
+              <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
+            <TextBlock Text="Split into /" VerticalAlignment="Center" />
+            <TextBox x:Name="SplitPrefixInput" Width="64" Height="30" VerticalContentAlignment="Center" Margin="6,0,0,0" />
+            <Button Content="Split" Click="SplitSubnet_OnClick" />
+            <Button Content="Copy Subnets" Click="CopySubnets_OnClick" />
+          </DockPanel>
+          <TextBlock x:Name="SubnetStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+        </Grid>
+      </TabItem>
+      <TabItem Header="Reputation">
+        <Grid Margin="10">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <DockPanel Margin="0,0,0,10">
+            <PasswordBox x:Name="ApiKeyBox" MinWidth="340" Height="34" VerticalContentAlignment="Center" ToolTip="AbuseIPDB API key" />
+            <Button Content="Save Key" Click="SaveKey_OnClick" />
+            <Button Content="Remove Key" Click="RemoveKey_OnClick" />
+          </DockPanel>
+          <DockPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBox x:Name="ReputationInput" MinWidth="360" Height="34" FontSize="15" VerticalContentAlignment="Center"
+                     ToolTip="Public IPv4 or IPv6 address" KeyDown="ReputationInput_OnKeyDown" />
+            <Button Content="Check" Click="Reputation_OnClick" />
+            <Button Content="Copy" Click="CopyReputation_OnClick" />
+          </DockPanel>
+          <TextBox x:Name="ReputationOutput" Grid.Row="2" Style="{StaticResource OutputBox}" />
+          <TextBlock x:Name="ReputationStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+        </Grid>
+      </TabItem>
+      <TabItem Header="Network">
+        <Grid Margin="10">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <WrapPanel Margin="0,0,0,10" VerticalAlignment="Center">
+            <TextBox x:Name="NetworkInput" Width="260" Height="32" VerticalContentAlignment="Center" ToolTip="IP address, hostname, or CIDR" />
+            <ComboBox x:Name="NetworkToolBox" Width="130" Height="32" SelectedIndex="0" Margin="8,0,0,0">
+              <ComboBoxItem Content="Ping"/><ComboBoxItem Content="Traceroute"/><ComboBoxItem Content="Port Scan"/>
+            </ComboBox>
+            <TextBox x:Name="CountInput" Width="56" Text="5" Height="32" Margin="8,0,0,0" ToolTip="Ping count" />
+            <CheckBox x:Name="ContinuousCheckBox" Content="Continuous" VerticalAlignment="Center" Margin="8,0,0,0" />
+            <TextBox x:Name="HopsInput" Width="52" Text="30" Height="32" Margin="8,0,0,0" ToolTip="Maximum traceroute hops" />
+            <CheckBox x:Name="ResolveCheckBox" Content="Resolve names" VerticalAlignment="Center" Margin="8,0,0,0" />
+          </WrapPanel>
+          <WrapPanel Grid.Row="1" Margin="0,0,0,12" VerticalAlignment="Center">
+            <TextBlock Text="Ports" VerticalAlignment="Center" />
+            <ComboBox x:Name="PortModeBox" Width="120" Height="30" SelectedIndex="0" Margin="8,0,0,0">
+              <ComboBoxItem Content="Top 100"/><ComboBoxItem Content="Top 1,000"/><ComboBoxItem Content="All"/><ComboBoxItem Content="Custom"/>
+            </ComboBox>
+            <TextBox x:Name="CustomPortsInput" Width="220" Text="22,80,443" Height="30" Margin="8,0,0,0" />
+            <Button x:Name="NetworkStartButton" Content="Start" Click="Network_OnClick" />
+            <Button x:Name="NetworkStopButton" Content="Stop" Click="StopNetwork_OnClick" IsEnabled="False" />
+            <Button Content="Copy Output" Click="CopyNetwork_OnClick" />
+          </WrapPanel>
+          <TextBox x:Name="NetworkOutput" Grid.Row="2" Style="{StaticResource OutputBox}" />
+          <TextBlock x:Name="NetworkStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+        </Grid>
+      </TabItem>
+      <TabItem Header="Speed Test">
+        <Grid Margin="10">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <Button x:Name="SpeedStartButton" Content="Start Speed Test" Click="Speed_OnClick" />
+            <Button x:Name="SpeedStopButton" Content="Stop" Click="StopSpeed_OnClick" IsEnabled="False" />
+            <Button Content="Copy Results" Click="CopySpeed_OnClick" />
+          </StackPanel>
+          <TextBox x:Name="SpeedOutput" Grid.Row="1" Style="{StaticResource OutputBox}" />
+          <TextBlock x:Name="SpeedStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="#617170" TextWrapping="Wrap"
+                     Text="A completed test transfers about 36 MB. Cloudflare sees your public IP and test traffic." />
+        </Grid>
+      </TabItem>
+    </TabControl>
+    <TextBlock Grid.Row="2" x:Name="GlobalStatus" Margin="2,10,0,0" Foreground="#617170" />
+  </Grid>
+</Window>

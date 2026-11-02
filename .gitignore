@@ -4,3 +4,6 @@ dist/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+Windows/**/bin/
+Windows/**/obj/
+Windows/dist/
