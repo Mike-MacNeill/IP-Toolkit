@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="IP Toolkit" Height="760" Width="920" MinHeight="560" MinWidth="700"
   WindowStyle="SingleBorderWindow" ResizeMode="CanResize" ShowInTaskbar="True"
-  WindowStartupLocation="CenterScreen" Background="#F4F6F5">
+  WindowStartupLocation="CenterScreen" Background="{DynamicResource WindowBackgroundBrush}">
   <Grid Margin="22">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -12,19 +12,21 @@
     </Grid.RowDefinitions>
     <DockPanel Margin="0,0,0,16">
       <StackPanel DockPanel.Dock="Left">
-        <TextBlock Text="IP Toolkit" FontSize="24" FontWeight="SemiBold" Foreground="#162A2A" />
-        <TextBlock Text="Network address utilities" Foreground="#617170" Margin="1,2,0,0" />
+        <TextBlock Text="IP Toolkit" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="Network address utilities" Foreground="{DynamicResource SecondaryTextBrush}" Margin="1,2,0,0" />
       </StackPanel>
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
         <CheckBox x:Name="LoginCheckBox" Content="Open at login" VerticalAlignment="Center" Margin="0,0,14,0"
                   Checked="Login_OnChanged" Unchecked="Login_OnChanged" />
+        <CheckBox x:Name="DarkModeCheckBox" Content="Dark mode" VerticalAlignment="Center" Margin="0,0,10,0"
+            Checked="Theme_OnChanged" Unchecked="Theme_OnChanged" />
         <Button Content="My IP" Click="MyIp_OnClick" />
         <Button Content="Minimize" Click="Minimize_OnClick" />
         <Button x:Name="MaximizeButton" Content="Maximize" Click="Maximize_OnClick" />
         <Button Content="Close" Click="Close_OnClick" />
       </StackPanel>
     </DockPanel>
-    <TabControl Grid.Row="1" x:Name="ToolsTabs" Background="White" Padding="8">
+    <TabControl Grid.Row="1" x:Name="ToolsTabs" Padding="8">
       <TabItem Header="IP Lookup">
         <Grid Margin="10">
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -36,7 +38,7 @@
             <Button Content="Copy" Click="CopyLookup_OnClick" />
           </DockPanel>
           <TextBox x:Name="LookupOutput" Grid.Row="1" Style="{StaticResource OutputBox}" />
-          <TextBlock x:Name="LookupStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+          <TextBlock x:Name="LookupStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
         </Grid>
       </TabItem>
       <TabItem Header="Subnet Calculator">
@@ -60,7 +62,7 @@
             <Button Content="Split" Click="SplitSubnet_OnClick" />
             <Button Content="Copy Subnets" Click="CopySubnets_OnClick" />
           </DockPanel>
-          <TextBlock x:Name="SubnetStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+          <TextBlock x:Name="SubnetStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
         </Grid>
       </TabItem>
       <TabItem Header="Reputation">
@@ -78,7 +80,7 @@
             <Button Content="Copy" Click="CopyReputation_OnClick" />
           </DockPanel>
           <TextBox x:Name="ReputationOutput" Grid.Row="2" Style="{StaticResource OutputBox}" />
-          <TextBlock x:Name="ReputationStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+          <TextBlock x:Name="ReputationStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
         </Grid>
       </TabItem>
       <TabItem Header="Network">
@@ -105,7 +107,7 @@
             <Button Content="Copy Output" Click="CopyNetwork_OnClick" />
           </WrapPanel>
           <TextBox x:Name="NetworkOutput" Grid.Row="2" Style="{StaticResource OutputBox}" />
-          <TextBlock x:Name="NetworkStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="#B42318" TextWrapping="Wrap" />
+          <TextBlock x:Name="NetworkStatus" Grid.Row="3" Margin="0,8,0,0" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
         </Grid>
       </TabItem>
       <TabItem Header="Speed Test">
@@ -117,11 +119,11 @@
             <Button Content="Copy Results" Click="CopySpeed_OnClick" />
           </StackPanel>
           <TextBox x:Name="SpeedOutput" Grid.Row="1" Style="{StaticResource OutputBox}" />
-          <TextBlock x:Name="SpeedStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="#617170" TextWrapping="Wrap"
+          <TextBlock x:Name="SpeedStatus" Grid.Row="2" Margin="0,8,0,0" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap"
                      Text="A completed test transfers about 36 MB. Cloudflare sees your public IP and test traffic." />
         </Grid>
       </TabItem>
     </TabControl>
-    <TextBlock Grid.Row="2" x:Name="GlobalStatus" Margin="2,10,0,0" Foreground="#617170" />
+    <TextBlock Grid.Row="2" x:Name="GlobalStatus" Margin="2,10,0,0" Foreground="{DynamicResource SecondaryTextBrush}" />
   </Grid>
 </Window>

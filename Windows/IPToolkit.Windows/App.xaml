@@ -3,10 +3,59 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
   <Application.Resources>
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F4F6F5" />
+    <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PrimaryTextBrush" Color="#162A2A" />
+    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#617170" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#D8E0DD" />
+    <SolidColorBrush x:Key="DangerTextBrush" Color="#B42318" />
+    <SolidColorBrush x:Key="GridLineBrush" Color="#D8E0DD" />
+    <SolidColorBrush x:Key="GridHeaderBrush" Color="#EEF2F0" />
+    <Style TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="MinWidth" Value="88" />
       <Setter Property="Margin" Value="4,0,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
+    <Style TargetType="PasswordBox">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
+    <Style TargetType="TabControl">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
     </Style>
     <Style TargetType="DataGrid">
       <Setter Property="AutoGenerateColumns" Value="False" />
@@ -15,8 +64,22 @@
       <Setter Property="HeadersVisibility" Value="Column" />
       <Setter Property="GridLinesVisibility" Value="Horizontal" />
       <Setter Property="RowHeaderWidth" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource GridLineBrush}" />
+      <Setter Property="RowBackground" Value="{DynamicResource SurfaceBackgroundBrush}" />
+      <Setter Property="AlternatingRowBackground" Value="{DynamicResource ControlBackgroundBrush}" />
     </Style>
-    <Style x:Key="OutputBox" TargetType="TextBox">
+    <Style TargetType="DataGridColumnHeader">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+      <Setter Property="Background" Value="{DynamicResource GridHeaderBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style TargetType="DataGridCell">
+      <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+    </Style>
+    <Style x:Key="OutputBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
       <Setter Property="IsReadOnly" Value="True" />
       <Setter Property="AcceptsReturn" Value="True" />
       <Setter Property="TextWrapping" Value="Wrap" />
@@ -24,8 +87,8 @@
       <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
       <Setter Property="Padding" Value="12" />
       <Setter Property="FontFamily" Value="Consolas" />
-      <Setter Property="BorderBrush" Value="#D8E0DD" />
-      <Setter Property="Background" Value="#FBFCFC" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
     </Style>
   </Application.Resources>
 </Application>

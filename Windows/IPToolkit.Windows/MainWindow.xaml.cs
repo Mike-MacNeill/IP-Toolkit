@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        var darkMode = IsDarkModeEnabled();
+        DarkModeCheckBox.IsChecked = darkMode;
+        ApplyTheme(darkMode);
         SubnetInput.Text = "192.168.1.10/24";
         LoginCheckBox.IsChecked = IsLoginEnabled();
         try
@@ -28,6 +31,55 @@ public partial class MainWindow : Window
         }
         catch (Exception error) { ReputationStatus.Text = error.Message; }
         Calculate();
+    }
+
+    private void Theme_OnChanged(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        var darkMode = DarkModeCheckBox.IsChecked == true;
+        ApplyTheme(darkMode);
+        using var settings = Registry.CurrentUser.CreateSubKey(@"Software\IP Toolkit");
+        settings.SetValue("DarkMode", darkMode ? 1 : 0, RegistryValueKind.DWord);
+    }
+
+    private static bool IsDarkModeEnabled()
+    {
+        using var settings = Registry.CurrentUser.OpenSubKey(@"Software\IP Toolkit");
+        return settings?.GetValue("DarkMode") is int value && value == 1;
+    }
+
+    private static void ApplyTheme(bool darkMode)
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        var colors = darkMode
+            ? new Dictionary<string, string>
+            {
+                ["WindowBackgroundBrush"] = "#141A19",
+                ["SurfaceBackgroundBrush"] = "#1B2221",
+                ["ControlBackgroundBrush"] = "#242D2B",
+                ["PrimaryTextBrush"] = "#E6EFEC",
+                ["SecondaryTextBrush"] = "#A7B7B2",
+                ["BorderBrush"] = "#3D4B47",
+                ["DangerTextBrush"] = "#FF8A80",
+                ["GridLineBrush"] = "#33413D",
+                ["GridHeaderBrush"] = "#242D2B"
+            }
+            : new Dictionary<string, string>
+            {
+                ["WindowBackgroundBrush"] = "#F4F6F5",
+                ["SurfaceBackgroundBrush"] = "#FFFFFF",
+                ["ControlBackgroundBrush"] = "#FFFFFF",
+                ["PrimaryTextBrush"] = "#162A2A",
+                ["SecondaryTextBrush"] = "#617170",
+                ["BorderBrush"] = "#D8E0DD",
+                ["DangerTextBrush"] = "#B42318",
+                ["GridLineBrush"] = "#D8E0DD",
+                ["GridHeaderBrush"] = "#EEF2F0"
+            };
+
+        foreach (var (key, color) in colors)
+            resources[key] = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
     }
 
     private void Calculate_OnClick(object sender, RoutedEventArgs e) => Calculate();
